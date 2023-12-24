@@ -1,0 +1,28 @@
+[package]
+name = "keybroker"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tyler Fanelli <tfanelli@redhat.com>"]
+homepage = "https://github.com/virtee/keybroker"
+license = "Apache-2.0"
+
+[[bin]]
+name = "keybroker"
+path = "src/main.rs"
+
+[dependencies]
+actix-web = { version = "4.4.0", features = ["cookies"] }
+base64 = "0.21"
+curl = "0.4.44"
+hex = "0.4"
+kbs-types = { git = "https://github.com/virtee/kbs-types.git", branch = "main", features = ["tee-snp"] }
+lazy_static = "1.4.0"
+libc = "0.2.150"
+openssl = "0.10.60"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sev = { git = "https://github.com/tylerfanelli/sev.git", branch = "gen_str", default-features = false, features = ["snp", "openssl"] }
+strum = { version = "0.25", features = ["derive"] }
+uuid = { version = "1.5.0", features = ["v4", "serde"] }
+regorus = { git = "https://github.com/microsoft/regorus.git", branch = "main" }
+bincode = "1.3.3"
