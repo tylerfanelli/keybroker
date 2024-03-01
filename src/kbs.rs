@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, sync::RwLock};
+use std::{collections::HashMap, str::FromStr, sync::RwLock};
 
-use actix_web::{cookie::Cookie, post, web, HttpResponse, Result};
+use actix_web::{cookie::Cookie, post, web, HttpRequest, HttpResponse, Result};
 use kbs_types::{Challenge, Request};
 use lazy_static::lazy_static;
 use openssl::{pkey::Public, rsa::Rsa};
@@ -45,6 +45,29 @@ pub async fn auth(req: web::Json<Request>) -> Result<HttpResponse> {
     };
 
     Ok(HttpResponse::Ok().cookie(cookie).json(c))
+}
+
+/// Reply to attestation challenge with a client's attestation evidence. Server will attest the
+/// evidence according to RATS and indicate whether the attestation was successful or not. On
+/// successful attestation, client's pre-registered attestation information will be made available
+/// for fetching from /key endpoint.
+#[allow(unreachable_code, unused_variables)]
+#[post("/attest")]
+pub async fn attest(
+    req: HttpRequest,
+    attest: web::Json<kbs_types::Attestation>,
+) -> Result<HttpResponse> {
+    let id = Uuid::from_str(req.cookie("kbs-session-id").unwrap().value()).unwrap();
+
+    let mut map = smap!();
+    let session = map.get_mut(&id).unwrap();
+
+    // TODO: Attest the workload.
+    todo!();
+
+    let cookie = Cookie::build("kbs-session-id", id.to_string()).finish();
+
+    Ok(HttpResponse::Ok().cookie(cookie).finish())
 }
 
 /// Describes the state managed between each step in the KBS protocol for a specific client.

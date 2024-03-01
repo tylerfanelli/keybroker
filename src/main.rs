@@ -12,7 +12,11 @@ async fn main() -> io::Result<()> {
     HttpServer::new(|| {
         App::new()
             .service(web::scope("/rvp").service(rats::rvp::register))
-            .service(web::scope("/kbs/v0").service(kbs::auth))
+            .service(
+                web::scope("/kbs/v0")
+                    .service(kbs::auth)
+                    .service(kbs::attest),
+            )
     })
     .bind(("0.0.0.0", 8000))?
     .run()
