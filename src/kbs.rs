@@ -9,12 +9,17 @@ use openssl::{pkey::Public, rsa::Rsa};
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
+/// To keep track of different KBS attestation sessions, maintain a mapping of ID's (stored via
+/// HTTP cookies) and session data.
 pub struct SessionMap(RwLock<HashMap<Uuid, Session>>);
 
+// Static, heap-allocated map of sessions.
 lazy_static! {
     pub static ref SESSION_MAP: SessionMap = SessionMap(RwLock::new(HashMap::new()));
 }
 
+// Lock the session map mutex for writing and return the underlying data in a mutable reference for
+// modification.
 #[macro_export]
 macro_rules! smap {
     () => {
@@ -22,6 +27,8 @@ macro_rules! smap {
     };
 }
 
+/// Initiate the attestation protocol and authenticate itself against the KBS. The KBS replies with
+/// a HTTP response of a Challenge and Set-Cookie header set to kbs-session-id={SESSION_UUID}.
 #[post("/auth")]
 pub async fn auth(req: web::Json<Request>) -> Result<HttpResponse> {
     let session = Session::from(req.into_inner());
@@ -40,6 +47,8 @@ pub async fn auth(req: web::Json<Request>) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().cookie(cookie).json(c))
 }
 
+/// Describes the state managed between each step in the KBS protocol for a specific client.
+/// Sessions are unique to each attesting client.
 #[allow(dead_code)]
 pub struct Session {
     id: Uuid,
@@ -60,6 +69,8 @@ impl From<Request> for Session {
 }
 
 impl Session {
+    /// Fetch the ID of this session (i.e. the ID in which the session is indexed in the session
+    /// map).
     pub fn id(&self) -> Uuid {
         self.id
     }
