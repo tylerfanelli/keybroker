@@ -234,6 +234,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.80"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ad32ce52e4161730f7098c077cd2ed6229b5804ccf99e5366be1ab72a98b4e1"
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -596,10 +602,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 
 [[package]]
+name = "kbs-types"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1f4b0642769e12f56cfc646d8be13668ed48d3caed0e99efb161c407f3ec532"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "keybroker"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "anyhow",
+ "kbs-types",
  "lazy_static",
  "openssl",
  "serde",

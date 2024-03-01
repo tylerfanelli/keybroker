@@ -6,6 +6,8 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.5.1"
+anyhow = "1.0.80"
+kbs-types = "0.5.3"
 lazy_static = "1.4.0"
 openssl = "0.10.64"
 serde = { version = "1.0.197", features = ["derive"] }
