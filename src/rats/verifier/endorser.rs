@@ -4,10 +4,16 @@ use anyhow::{anyhow, Context, Result};
 use curl::easy::Easy;
 
 #[allow(dead_code)]
+/// Verify that the given TEE evidence is legitimate and "endorsed". An endorsement is a secure
+/// statement that some entity (e.g., a manufacturer) vouches for the integrity of the device's
+/// various capabilities.
 pub trait Endorser {
     fn endorse(&self) -> Result<()>;
 }
 
+/// SEV-SNP evidence is endorsed by verifying that the attestation report's signature is signed by
+/// the processor's Versioned Chip Endorsement Key (VCEK), and the VCEK is signed by AMD's
+/// Certificate Authority (CA) chain.
 pub mod snp {
     use super::*;
 
@@ -20,11 +26,15 @@ pub mod snp {
         Generation,
     };
 
+    /// The attestation report's signature needs to be validated with the CA/VCEK chain. The VCEK
+    /// that is fetched from AMD's Key Distribution Server (KDS) is dependant on the SEV-SNP
+    /// processor generation that the processor belongs to (Milan, Genoa, etc...).
     pub struct SnpEndorser<'a> {
         report: &'a AttestationReport,
         gen: Generation,
     }
 
+    /// Fetch the AMD CA/VCEK chain and ensure that the attestation report's signature is verified.
     impl<'a> Endorser for SnpEndorser<'a> {
         fn endorse(&self) -> Result<()> {
             let chain = self.chain().context("unable to fetch AMD ARK/ASK chain")?;
@@ -50,6 +60,7 @@ pub mod snp {
     }
 
     impl<'a> SnpEndorser<'a> {
+        /// Fetch the AMD CA/VCEK chain.
         fn chain(&self) -> Result<Chain> {
             let ca = ca::Chain::from(self.gen);
             ca.verify().context("unable to verify AMD CA chain")?;
@@ -64,6 +75,8 @@ pub mod snp {
             Ok(chain)
         }
 
+        /// Fetch the Versioned Chip Endorsement Key (VCEK) from the attestation report's CHIP_ID
+        /// and the given processor generation.
         fn vcek(&self) -> Result<X509> {
             let id = hex::encode(self.report.chip_id);
             let url = format!(
@@ -81,6 +94,7 @@ pub mod snp {
     }
 }
 
+/// cURL GET request.
 fn curl_get(url: String) -> Result<Vec<u8>, curl::Error> {
     let mut handle = Easy::new();
     let mut buf: Vec<u8> = Vec::new();
