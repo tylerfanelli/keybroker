@@ -2,7 +2,10 @@
 
 mod endorser;
 
-use anyhow::Result;
+use endorser::Endorser;
+
+use anyhow::{anyhow, Result};
+use openssl::base64;
 
 /// A Verifer for each specific TEE architecture. Verification of hardware evidence (i.e.
 /// attestation reports) encompasses both endorsement and "freshness".
@@ -36,4 +39,68 @@ pub trait Verifier {
     /// Return a JSON-encoded string of all of the parsed claims of the respective TEE's
     /// attestation report.
     fn claims(&self) -> serde_json::Value;
+}
+
+pub mod snp {
+    use super::{endorser::snp::SnpEndorser, *};
+
+    use std::convert::From;
+
+    use openssl::{pkey::Public, rsa::Rsa, sha::Sha512};
+    use sev::{firmware::guest::AttestationReport, Generation};
+    use uuid::Uuid;
+
+    pub struct SnpVerifier {
+        nonce: Uuid,
+        report: AttestationReport,
+        gen: Generation,
+        pkey: Rsa<Public>,
+    }
+
+    impl Verifier for SnpVerifier {
+        fn endorse(&self) -> Result<()> {
+            let endorser = SnpEndorser::from((&self.report, self.gen));
+
+            endorser.endorse()
+        }
+
+        fn freshness(&self) -> Result<()> {
+            let b64_n = base64::encode_block(&self.pkey.n().to_vec());
+            let b64_e = base64::encode_block(&self.pkey.e().to_vec());
+
+            let expect = {
+                let mut hash = Sha512::new();
+
+                hash.update(self.nonce.to_string().as_bytes());
+                hash.update(b64_n.as_bytes());
+                hash.update(b64_e.as_bytes());
+
+                hash.finish()
+            };
+
+            if expect != self.report.report_data {
+                return Err(anyhow!("freshness hash mismatch"));
+            }
+
+            Ok(())
+        }
+
+        fn claims(&self) -> serde_json::Value {
+            serde_json::json!({
+                "measurement": format!("{}", hex::encode(self.report.measurement)),
+                "policy_abi_major": format!("{}", self.report.policy.abi_major()),
+                "policy_abi_minor": format!("{}", self.report.policy.abi_minor()),
+                "policy_smt_allowed": format!("{}", self.report.policy.smt_allowed()),
+                "policy_migrate_ma": format!("{}", self.report.policy.migrate_ma_allowed()),
+                "policy_debug_allowed": format!("{}", self.report.policy.debug_allowed()),
+                "policy_single_socket": format!("{}", self.report.policy.single_socket_required()),
+                "reported_tcb_bootloader": format!("{}", self.report.reported_tcb.bootloader),
+                "reported_tcb_tee": format!("{}", self.report.reported_tcb.tee),
+                "reported_tcb_snp": format!("{}", self.report.reported_tcb.snp),
+                "reported_tcb_microcode": format!("{}", self.report.reported_tcb.microcode),
+                "platform_tsme_enabled": format!("{}", self.report.plat_info.tsme_enabled()),
+                "platform_smt_enabled": format!("{}", self.report.plat_info.smt_enabled()),
+            })
+        }
+    }
 }
