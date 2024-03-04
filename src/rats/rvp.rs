@@ -11,7 +11,7 @@ use serde_json::{to_string as json, Map, Value};
 use uuid::Uuid;
 
 /// A client's reference values to compare with its TEE evidence in the appraisal process.
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct RvpRefValues {
     /// Queries on the TEE evidence with respect to the attestation policy.
     pub query: Vec<String>,
@@ -95,15 +95,16 @@ impl Rvp {
     }
 
     /// Fetch the reference values from the UUID found in a client's evidence.
-    pub fn get(&self, id: &Uuid) -> Result<&RvpRefValues> {
-        Ok(&self
+    pub fn get(&self, id: &Uuid) -> Result<RvpRefValues> {
+        Ok(self
             .vals
             .get(id)
             .ok_or(anyhow!(format!(
                 "no reference values found for UUID {}",
                 id
             )))?
-            .0)
+            .0
+            .clone())
     }
 }
 

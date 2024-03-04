@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod appraisal;
 pub(super) mod rvp;
 mod verifier;
 
 use super::kbs;
 
+use appraisal::{opa::OpaAppraiser, Appraiser};
 use rvp::{rvp_map, RVP_MAP};
 use verifier::{snp::SnpVerifier, Verifier};
 
@@ -21,9 +23,12 @@ pub fn attest(
         _ => return Err(anyhow!("selected TEE is not supported")),
     };
 
-    let (_claims, rvp_id) = verifier.verify()?;
+    let (claims, rvp_id) = verifier.verify()?;
 
-    let _ref_vals = rvp_map!().get(&rvp_id)?;
+    let ref_vals = rvp_map!().get(&rvp_id)?;
+    let opa = OpaAppraiser::try_from((ref_vals, claims)).unwrap();
+
+    opa.appraise().unwrap();
 
     todo!()
 }
