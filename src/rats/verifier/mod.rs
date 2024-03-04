@@ -4,7 +4,7 @@ mod endorser;
 
 use endorser::Endorser;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use openssl::base64;
 
 /// A Verifer for each specific TEE architecture. Verification of hardware evidence (i.e.
@@ -44,9 +44,9 @@ pub trait Verifier {
 pub mod snp {
     use super::{endorser::snp::SnpEndorser, *};
 
-    use std::convert::From;
+    use std::{convert::From, ptr::read};
 
-    use openssl::{pkey::Public, rsa::Rsa, sha::Sha512};
+    use openssl::{bn::BigNum, pkey::Public, rsa::Rsa, sha::Sha512};
     use sev::{firmware::guest::AttestationReport, Generation};
     use uuid::Uuid;
 
@@ -102,5 +102,45 @@ pub mod snp {
                 "platform_smt_enabled": format!("{}", self.report.plat_info.smt_enabled()),
             })
         }
+    }
+
+    impl TryFrom<(kbs_types::Attestation, Uuid)> for SnpVerifier {
+        type Error = anyhow::Error;
+
+        fn try_from(attestation: (kbs_types::Attestation, Uuid)) -> Result<Self> {
+            let args: kbs_types::SnpAttestation = serde_json::from_str(&attestation.0.tee_evidence)
+                .context(
+                    "unable to parse SNP attestation args from KBS attestation type's TEE evidence field"
+                )?;
+
+            let report = unsafe {
+                let bytes = hex::decode(args.report.clone())
+                    .context("unable to decode attestation report from hex")?;
+
+                read(bytes.as_ptr() as *const AttestationReport)
+            };
+
+            let gen = match Generation::try_from(args.gen.to_string()) {
+                Ok(g) => g,
+                Err(_) => return Err(anyhow!("invalid TEE generation")),
+            };
+
+            let n = pkey_decode(attestation.0.tee_pubkey.k_mod)?;
+            let e = pkey_decode(attestation.0.tee_pubkey.k_exp)?;
+
+            Ok(Self {
+                nonce: attestation.1,
+                report,
+                gen,
+                pkey: Rsa::from_public_components(n, e)
+                    .context("unable to build RSA public key from submitted public components")?,
+            })
+        }
+    }
+
+    fn pkey_decode(b64: String) -> Result<BigNum> {
+        let bytes = base64::decode_block(&b64).context("unable to decode block from base64")?;
+
+        BigNum::from_slice(&bytes).context("unable to convert public key encoding")
     }
 }
