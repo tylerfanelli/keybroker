@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use super::rats;
+
 use std::{collections::HashMap, str::FromStr, sync::RwLock};
 
 use actix_web::{cookie::Cookie, post, web, HttpRequest, HttpResponse, Result};
@@ -62,8 +64,7 @@ pub async fn attest(
     let mut map = smap!();
     let session = map.get_mut(&id).unwrap();
 
-    // TODO: Attest the workload.
-    todo!();
+    let resources = rats::attest(attest.into_inner(), session).unwrap();
 
     let cookie = Cookie::build("kbs-session-id", id.to_string()).finish();
 
@@ -96,5 +97,10 @@ impl Session {
     /// map).
     pub fn id(&self) -> Uuid {
         self.id
+    }
+
+    /// Fetch the TEE that the session is attesting for.
+    pub fn tee(&self) -> kbs_types::Tee {
+        self.tee
     }
 }
