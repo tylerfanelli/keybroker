@@ -6,6 +6,7 @@ use endorser::Endorser;
 
 use anyhow::{anyhow, Context, Result};
 use openssl::base64;
+use uuid::Uuid;
 
 /// A Verifer for each specific TEE architecture. Verification of hardware evidence (i.e.
 /// attestation reports) encompasses both endorsement and "freshness".
@@ -22,11 +23,11 @@ use openssl::base64;
 pub trait Verifier {
     /// Verify that attestation evidence is both endorsed by the hardware manufacturer, as
     /// well as ruled "fresh" by checking its nonce hash and public key.
-    fn verify(&self) -> Result<serde_json::Value> {
+    fn verify(&self) -> Result<(serde_json::Value, Uuid)> {
         self.endorse()?;
         self.freshness()?;
 
-        Ok(self.claims())
+        Ok((self.claims(), self.rvp_id()))
     }
 
     /// Ensure that the attestation evidence is endorsed by the hardware manufacturer.
@@ -38,6 +39,9 @@ pub trait Verifier {
     /// Return a JSON-encoded string of all of the parsed claims of the respective TEE's
     /// attestation report.
     fn claims(&self) -> serde_json::Value;
+
+    /// Get the UUID used to identify this client's reference values in the RVP storage.
+    fn rvp_id(&self) -> Uuid;
 }
 
 pub mod snp {
@@ -100,6 +104,13 @@ pub mod snp {
                 "platform_tsme_enabled": format!("{}", self.report.plat_info.tsme_enabled()),
                 "platform_smt_enabled": format!("{}", self.report.plat_info.smt_enabled()),
             })
+        }
+
+        fn rvp_id(&self) -> Uuid {
+            let mut bytes = [0u8; 16];
+            bytes.copy_from_slice(&self.report.host_data[..16]);
+
+            Uuid::from_bytes(bytes)
         }
     }
 

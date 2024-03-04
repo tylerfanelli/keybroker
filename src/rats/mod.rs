@@ -19,7 +19,7 @@ pub fn attest(
         _ => return Err(anyhow!("selected TEE is not supported")),
     };
 
-    let _claims = verifier.verify()?;
+    let (_claims, _rvp_id) = verifier.verify()?;
 
     todo!()
 }
