@@ -10,7 +10,6 @@ use anyhow::{anyhow, Result};
 use kbs_types::Tee;
 use serde_json::{Map, Value};
 
-#[allow(dead_code)]
 pub fn attest(
     attestation: kbs_types::Attestation,
     session: &mut kbs::Session,

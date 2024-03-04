@@ -19,7 +19,6 @@ use openssl::base64;
 ///
 /// On successful, a JSON-encoded string containing all of the parsed claims found from the TEE
 /// evidence is returned to be checked by the appraisal policy.
-#[allow(dead_code)]
 pub trait Verifier {
     /// Verify that attestation evidence is both endorsed by the hardware manufacturer, as
     /// well as ruled "fresh" by checking its nonce hash and public key.

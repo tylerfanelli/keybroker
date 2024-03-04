@@ -53,7 +53,6 @@ pub async fn auth(req: web::Json<Request>) -> Result<HttpResponse> {
 /// evidence according to RATS and indicate whether the attestation was successful or not. On
 /// successful attestation, client's pre-registered attestation information will be made available
 /// for fetching from /key endpoint.
-#[allow(unreachable_code, unused_variables)]
 #[post("/attest")]
 pub async fn attest(
     req: HttpRequest,
@@ -64,7 +63,7 @@ pub async fn attest(
     let mut map = smap!();
     let session = map.get_mut(&id).unwrap();
 
-    let resources = rats::attest(attest.into_inner(), session).unwrap();
+    let _resources = rats::attest(attest.into_inner(), session).unwrap();
 
     let cookie = Cookie::build("kbs-session-id", id.to_string()).finish();
 

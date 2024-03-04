@@ -3,7 +3,6 @@
 use anyhow::{anyhow, Context, Result};
 use curl::easy::Easy;
 
-#[allow(dead_code)]
 /// Verify that the given TEE evidence is legitimate and "endorsed". An endorsement is a secure
 /// statement that some entity (e.g., a manufacturer) vouches for the integrity of the device's
 /// various capabilities.
