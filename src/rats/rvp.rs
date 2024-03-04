@@ -3,6 +3,7 @@
 use std::{collections::HashMap, sync::Mutex};
 
 use actix_web::{post, web::Json, HttpResponse};
+use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
 use openssl::sha::Sha256;
 use serde::{Deserialize, Serialize};
@@ -40,6 +41,8 @@ macro_rules! rvp_map {
         RVP_MAP.lock().unwrap()
     };
 }
+
+pub(crate) use rvp_map;
 
 impl Rvp {
     /// Insert a set of reference values and return their associated UUID. Note that if the
@@ -89,6 +92,18 @@ impl Rvp {
         }
 
         sha.finish()
+    }
+
+    /// Fetch the reference values from the UUID found in a client's evidence.
+    pub fn get(&self, id: &Uuid) -> Result<&RvpRefValues> {
+        Ok(&self
+            .vals
+            .get(id)
+            .ok_or(anyhow!(format!(
+                "no reference values found for UUID {}",
+                id
+            )))?
+            .0)
     }
 }
 

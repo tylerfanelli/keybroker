@@ -4,6 +4,8 @@ pub(super) mod rvp;
 mod verifier;
 
 use super::kbs;
+
+use rvp::{rvp_map, RVP_MAP};
 use verifier::{snp::SnpVerifier, Verifier};
 
 use anyhow::{anyhow, Result};
@@ -19,7 +21,9 @@ pub fn attest(
         _ => return Err(anyhow!("selected TEE is not supported")),
     };
 
-    let (_claims, _rvp_id) = verifier.verify()?;
+    let (_claims, rvp_id) = verifier.verify()?;
+
+    let _ref_vals = rvp_map!().get(&rvp_id)?;
 
     todo!()
 }
