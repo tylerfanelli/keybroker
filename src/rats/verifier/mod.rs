@@ -49,7 +49,7 @@ pub mod snp {
 
     use std::{convert::From, ptr::read};
 
-    use openssl::{bn::BigNum, pkey::Public, rsa::Rsa, sha::Sha512};
+    use openssl::{pkey::Public, rsa::Rsa, sha::Sha512};
     use sev::{firmware::guest::AttestationReport, Generation};
     use uuid::Uuid;
 
@@ -114,11 +114,11 @@ pub mod snp {
         }
     }
 
-    impl TryFrom<(kbs_types::Attestation, Uuid)> for SnpVerifier {
+    impl TryFrom<(kbs_types::Attestation, Uuid, Rsa<Public>)> for SnpVerifier {
         type Error = anyhow::Error;
 
-        fn try_from(attestation: (kbs_types::Attestation, Uuid)) -> Result<Self> {
-            let args: kbs_types::SnpAttestation = serde_json::from_str(&attestation.0.tee_evidence)
+        fn try_from(data: (kbs_types::Attestation, Uuid, Rsa<Public>)) -> Result<Self> {
+            let args: kbs_types::SnpAttestation = serde_json::from_str(&data.0.tee_evidence)
                 .context(
                     "unable to parse SNP attestation args from KBS attestation type's TEE evidence field"
                 )?;
@@ -135,22 +135,12 @@ pub mod snp {
                 Err(_) => return Err(anyhow!("invalid TEE generation")),
             };
 
-            let n = pkey_decode(attestation.0.tee_pubkey.k_mod)?;
-            let e = pkey_decode(attestation.0.tee_pubkey.k_exp)?;
-
             Ok(Self {
-                nonce: attestation.1,
+                nonce: data.1,
                 report,
                 gen,
-                pkey: Rsa::from_public_components(n, e)
-                    .context("unable to build RSA public key from submitted public components")?,
+                pkey: data.2,
             })
         }
-    }
-
-    fn pkey_decode(b64: String) -> Result<BigNum> {
-        let bytes = base64::decode_block(&b64).context("unable to decode block from base64")?;
-
-        BigNum::from_slice(&bytes).context("unable to convert public key encoding")
     }
 }
