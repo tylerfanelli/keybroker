@@ -5,7 +5,8 @@ mod endorser;
 use endorser::Endorser;
 
 use anyhow::{anyhow, Context, Result};
-use openssl::base64;
+use kbs_types::{Attestation, Tee};
+use openssl::{base64, pkey::Public, rsa::Rsa};
 use uuid::Uuid;
 
 /// A Verifer for each specific TEE architecture. Verification of hardware evidence (i.e.
@@ -42,6 +43,19 @@ pub trait Verifier {
 
     /// Get the UUID used to identify this client's reference values in the RVP storage.
     fn rvp_id(&self) -> Uuid;
+}
+
+impl TryFrom<(Tee, Attestation, Uuid, Rsa<Public>)> for Box<dyn Verifier> {
+    type Error = anyhow::Error;
+
+    fn try_from(data: (Tee, Attestation, Uuid, Rsa<Public>)) -> Result<Self, Self::Error> {
+        match data.0 {
+            Tee::Snp => Ok(Box::new(snp::SnpVerifier::try_from((
+                data.1, data.2, data.3,
+            ))?)),
+            _ => Err(anyhow!("unsupported TEE")),
+        }
+    }
 }
 
 pub mod snp {

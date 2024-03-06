@@ -8,10 +8,9 @@ use super::kbs;
 
 use appraisal::{opa::OpaAppraiser, Appraiser};
 use rvp::{rvp_map, RVP_MAP};
-use verifier::{snp::SnpVerifier, Verifier};
+use verifier::Verifier;
 
-use anyhow::{anyhow, Context, Result};
-use kbs_types::Tee;
+use anyhow::{Context, Result};
 use openssl::{base64, bn::BigNum, pkey::Public, rsa::Rsa};
 use serde_json::{Map, Value};
 
@@ -21,10 +20,8 @@ pub fn attest(
 ) -> Result<(Map<String, Value>, Rsa<Public>)> {
     let pkey = pkey(attestation.tee_pubkey.clone())?;
 
-    let verifier: Box<dyn Verifier> = match session.tee() {
-        Tee::Snp => Box::new(SnpVerifier::try_from((attestation, session.id(), pkey))?),
-        _ => return Err(anyhow!("selected TEE is not supported")),
-    };
+    let verifier: Box<dyn Verifier> =
+        (session.tee(), attestation, session.id(), pkey).try_into()?;
 
     let (claims, rvp_id) = verifier.verify()?;
 
