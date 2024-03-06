@@ -15,7 +15,8 @@ async fn main() -> io::Result<()> {
             .service(
                 web::scope("/kbs/v0")
                     .service(kbs::auth)
-                    .service(kbs::attest),
+                    .service(kbs::attest)
+                    .service(kbs::resource),
             )
     })
     .bind(("0.0.0.0", 8000))?

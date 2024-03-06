@@ -4,10 +4,13 @@ use super::rats;
 
 use std::{collections::HashMap, str::FromStr, sync::RwLock};
 
-use actix_web::{cookie::Cookie, post, web, HttpRequest, HttpResponse, Result};
+use actix_web::{cookie::Cookie, get, post, web, HttpRequest, HttpResponse, Result};
 use kbs_types::{Challenge, Request};
 use lazy_static::lazy_static;
-use openssl::{pkey::Public, rsa::Rsa};
+use openssl::{
+    pkey::Public,
+    rsa::{Padding, Rsa},
+};
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
@@ -72,6 +75,25 @@ pub async fn attest(
     Ok(HttpResponse::Ok().cookie(cookie).finish())
 }
 
+#[get("/resource/{name}")]
+pub async fn resource(req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse> {
+    let id = Uuid::from_str(req.cookie("kbs-session-id").unwrap().value()).unwrap();
+    let resource_name = path.into_inner();
+
+    let mut map = smap!();
+    let session = map.get_mut(&id).unwrap();
+
+    let resp = kbs_types::Response {
+        protected: "".to_string(),
+        encrypted_key: "".to_string(),
+        iv: "".to_string(),
+        ciphertext: session.encrypted_resource(resource_name),
+        tag: "".to_string(),
+    };
+
+    Ok(HttpResponse::Ok().json(resp))
+}
+
 /// Describes the state managed between each step in the KBS protocol for a specific client.
 /// Sessions are unique to each attesting client.
 #[allow(dead_code)]
@@ -109,5 +131,22 @@ impl Session {
     /// key used to encrypt the resources.
     pub fn resources_set(&mut self, data: (Rsa<Public>, Map<String, Value>)) {
         self.resources = Some(data);
+    }
+
+    /// Attempt to fetch a resource from a client's resource map. The resource must be encrypted
+    /// with the client's public key.
+    pub fn encrypted_resource(&self, name: String) -> String {
+        let (key, map) = self.resources.as_ref().unwrap();
+
+        let val = match map.get(&name).unwrap() {
+            Value::String(s) => s,
+            _ => panic!("not a string"),
+        };
+
+        let mut encrypted = vec![0; key.size() as usize];
+        key.public_encrypt(val.as_bytes(), &mut encrypted, Padding::PKCS1)
+            .unwrap();
+
+        hex::encode(encrypted)
     }
 }
