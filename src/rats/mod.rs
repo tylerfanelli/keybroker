@@ -17,20 +17,20 @@ use serde_json::{Map, Value};
 pub fn attest(
     attestation: kbs_types::Attestation,
     session: &mut kbs::Session,
-) -> Result<(Map<String, Value>, Rsa<Public>)> {
+) -> Result<(Rsa<Public>, Map<String, Value>)> {
     let pkey = pkey(attestation.tee_pubkey.clone())?;
 
     let verifier: Box<dyn Verifier> =
-        (session.tee(), attestation, session.id(), pkey).try_into()?;
+        (session.tee(), attestation, session.id(), pkey.clone()).try_into()?;
 
     let (claims, rvp_id) = verifier.verify()?;
 
     let ref_vals = rvp_map!().get(&rvp_id)?;
-    let opa = OpaAppraiser::try_from((ref_vals, claims)).unwrap();
+    let opa = OpaAppraiser::try_from((ref_vals.clone(), claims)).unwrap();
 
     opa.appraise().unwrap();
 
-    todo!()
+    Ok((pkey, ref_vals.resources))
 }
 
 fn pkey(kbs: kbs_types::TeePubKey) -> Result<Rsa<Public>> {

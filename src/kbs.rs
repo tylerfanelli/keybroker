@@ -63,7 +63,9 @@ pub async fn attest(
     let mut map = smap!();
     let session = map.get_mut(&id).unwrap();
 
-    let _resources = rats::attest(attest.into_inner(), session).unwrap();
+    let resources = rats::attest(attest.into_inner(), session).unwrap();
+
+    session.resources_set(resources);
 
     let cookie = Cookie::build("kbs-session-id", id.to_string()).finish();
 
@@ -101,5 +103,11 @@ impl Session {
     /// Fetch the TEE that the session is attesting for.
     pub fn tee(&self) -> kbs_types::Tee {
         self.tee
+    }
+
+    /// On successful attestation, give the session access to both the resources and the RSA public
+    /// key used to encrypt the resources.
+    pub fn resources_set(&mut self, data: (Rsa<Public>, Map<String, Value>)) {
+        self.resources = Some(data);
     }
 }
