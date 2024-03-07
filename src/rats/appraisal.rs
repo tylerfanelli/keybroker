@@ -27,7 +27,7 @@ pub mod opa {
     use serde::{Deserialize, Serialize};
 
     lazy_static! {
-        pub static ref OPA_POLICY: Mutex<String> = Mutex::new(String::new());
+        pub static ref OPA_POLICY: Mutex<String> = Mutex::new("package policy".to_string());
     }
 
     macro_rules! opa_policy {
