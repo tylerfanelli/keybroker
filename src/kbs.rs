@@ -2,9 +2,17 @@
 
 use super::rats;
 
-use std::{collections::HashMap, str::FromStr, sync::RwLock};
+use std::{collections::HashMap, fmt, str::FromStr, sync::RwLock};
 
-use actix_web::{cookie::Cookie, get, post, web, HttpRequest, HttpResponse, Result};
+use actix_web::{
+    body::BoxBody,
+    cookie::Cookie,
+    error::ResponseError,
+    get,
+    http::{header::ContentType, StatusCode},
+    post, web, HttpRequest, HttpResponse, Result,
+};
+use anyhow::Context;
 use kbs_types::{Challenge, Request};
 use lazy_static::lazy_static;
 use openssl::{
@@ -61,12 +69,15 @@ pub async fn attest(
     req: HttpRequest,
     attest: web::Json<kbs_types::Attestation>,
 ) -> Result<HttpResponse> {
-    let id = Uuid::from_str(req.cookie("kbs-session-id").unwrap().value()).unwrap();
+    let id = kbs_session_id(req).map_err(KeybrokerError)?;
 
     let mut map = smap!();
-    let session = map.get_mut(&id).unwrap();
+    let session = map
+        .get_mut(&id)
+        .context(format!("session with ID {} not found", id))
+        .map_err(KeybrokerError)?;
 
-    let resources = rats::attest(attest.into_inner(), session).unwrap();
+    let resources = rats::attest(attest.into_inner(), session).map_err(KeybrokerError)?;
 
     session.resources_set(resources);
 
@@ -77,11 +88,15 @@ pub async fn attest(
 
 #[get("/resource/{name}")]
 pub async fn resource(req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse> {
-    let id = Uuid::from_str(req.cookie("kbs-session-id").unwrap().value()).unwrap();
+    let id = kbs_session_id(req).map_err(KeybrokerError)?;
+
     let resource_name = path.into_inner();
 
     let mut map = smap!();
-    let session = map.get_mut(&id).unwrap();
+    let session = map
+        .get_mut(&id)
+        .context(format!("session with ID {} not found", id))
+        .map_err(KeybrokerError)?;
 
     let resp = kbs_types::Response {
         protected: "".to_string(),
@@ -149,4 +164,43 @@ impl Session {
 
         hex::encode(encrypted)
     }
+}
+
+/// A wrapper around anyhow Errors to allow for implementing actix_web::ResponseError. This allows
+/// anyhow Errors to be cleanly consumed, with their error messages being returned to the attesting
+/// client.
+#[derive(Debug)]
+pub struct KeybrokerError(anyhow::Error);
+
+impl fmt::Display for KeybrokerError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl ResponseError for KeybrokerError {
+    /// Something was wrong with the request. This could mean the attestation evidence was faulty,
+    /// a resource that doesn't exist was requested, the public keys were unable to correctly
+    /// parsed, etc.
+    fn status_code(&self) -> StatusCode {
+        StatusCode::BAD_REQUEST
+    }
+
+    /// Wrap the anyhow Error's message into an HttpResponse so the client can discover what went
+    /// wrong in their attestation.
+    fn error_response(&self) -> HttpResponse<BoxBody> {
+        HttpResponse::build(self.status_code())
+            .insert_header(ContentType::html())
+            .body(format!("keybroker error: {}", self.0))
+    }
+}
+
+/// Given an HTTP request from an attesting/attested client, parse the kbs-session-id cookie that
+/// was set in the authentication phase (/auth).
+fn kbs_session_id(req: HttpRequest) -> anyhow::Result<Uuid> {
+    let cookie = req
+        .cookie("kbs-session-id")
+        .context("kbs-session-id cookie not found")?;
+
+    Uuid::from_str(cookie.value()).context("value of kbs-session-id cookie not a valid UUID")
 }
