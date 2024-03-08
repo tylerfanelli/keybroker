@@ -98,11 +98,15 @@ pub async fn resource(req: HttpRequest, path: web::Path<String>) -> Result<HttpR
         .context(format!("session with ID {} not found", id))
         .map_err(KeybrokerError)?;
 
+    let ciphertext = session
+        .encrypted_resource(resource_name)
+        .map_err(KeybrokerError)?;
+
     let resp = kbs_types::Response {
         protected: "".to_string(),
         encrypted_key: "".to_string(),
         iv: "".to_string(),
-        ciphertext: session.encrypted_resource(resource_name),
+        ciphertext,
         tag: "".to_string(),
     };
 
@@ -150,19 +154,23 @@ impl Session {
 
     /// Attempt to fetch a resource from a client's resource map. The resource must be encrypted
     /// with the client's public key.
-    pub fn encrypted_resource(&self, name: String) -> String {
-        let (key, map) = self.resources.as_ref().unwrap();
+    pub fn encrypted_resource(&self, name: String) -> anyhow::Result<String> {
+        let (key, map) = self.resources.as_ref().context("session is unattested")?;
 
-        let val = match map.get(&name).unwrap() {
+        let val = map
+            .get(&name)
+            .context(format!("resource with name {} not found", name))?;
+
+        let val = match val {
             Value::String(s) => s,
             _ => panic!("not a string"),
         };
 
         let mut encrypted = vec![0; key.size() as usize];
         key.public_encrypt(val.as_bytes(), &mut encrypted, Padding::PKCS1)
-            .unwrap();
+            .context(format!("unable to encrypt {} resource", name))?;
 
-        hex::encode(encrypted)
+        Ok(hex::encode(encrypted))
     }
 }
 
