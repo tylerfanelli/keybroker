@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Mutex};
 use actix_web::{post, web::Json, HttpResponse};
 use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
-use openssl::sha::Sha256;
+use openssl::{base64, sha::Sha256};
 use serde::{Deserialize, Serialize};
 use serde_json::{to_string as json, Map, Value};
 use uuid::Uuid;
@@ -111,5 +111,11 @@ impl Rvp {
 /// Register a client's reference values with the RATS reference value provider (RVP).
 #[post("/register")]
 pub async fn register(json: Json<RvpRefValues>) -> actix_web::Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(rvp_map!().insert(json.into_inner()).to_string()))
+    let mut response = [0u8; 32];
+
+    let rvp_id = rvp_map!().insert(json.into_inner());
+    response[..16].copy_from_slice(rvp_id.as_bytes());
+    response[16..].copy_from_slice(&[0u8; 16]);
+
+    Ok(HttpResponse::Ok().json(base64::encode_block(&response)))
 }
