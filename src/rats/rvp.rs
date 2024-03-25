@@ -117,5 +117,5 @@ pub async fn register(json: Json<RvpRefValues>) -> actix_web::Result<HttpRespons
     response[..16].copy_from_slice(rvp_id.as_bytes());
     response[16..].copy_from_slice(&[0u8; 16]);
 
-    Ok(HttpResponse::Ok().json(base64::encode_block(&response)))
+    Ok(HttpResponse::Ok().body(base64::encode_block(&response)))
 }
